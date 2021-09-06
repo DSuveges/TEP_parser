@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup, UnicodeDammit
 import gzip
 import argparse
 import logging
+import logging.config
 import sys
 
 
@@ -116,23 +117,26 @@ def tep_lookup(link):
 
     return uniprot_ids
 
-def generate(row):
-    return {
-        row['gene_id']:{
-            'id': row['gene_id'],
-            'symbol': row['symbol'],
-            'link': row['TEP_url'],
-            'disease': row['disease'],
-            'uniprot_id': row['uniprot_id']
-        }
-    }
-
+def write_output(tep_df, outputFile, jsonl=True):
+    if jsonl:
+        tep_df.to_json(outputFile, orient='records', lines=True, compression='gzip')
+    else:
+        TEPs = {row['gene_id']:{
+                'id': row['gene_id'],
+                'symbol': row['symbol'],
+                'link': row['TEP_url'],
+                'disease': row['disease'],
+                'uniprot_id': row['uniprot_id']}
+                for i, row in tep_df.iterrows()}
+        with gzip.open(outputFile, 'wt', encoding="ascii") as f:
+            json.dump(TEPs, f)
 
 def main():
 
     # Reading output file name from the command line:
     parser = argparse.ArgumentParser(description="This script fetches TEP data from the Structural Genomics Consortium.")
     parser.add_argument('--output', '-o', type=str, help='Output file. gzipped JSON', required = True)
+    parser.add_argument('--lines', required=False, action='store_false', help='Flag to output the results in JSON multiline.')  
     parser.add_argument('--logFile', type=str, help='File into which the logs are saved', required=False)
     args = parser.parse_args()
 
@@ -176,18 +180,8 @@ def main():
 
     # Printing:
     logging.info(f'Saving data to {outputFile}.')
-    TEPs = {row['gene_id']:{
-            'id': row['gene_id'],
-            'symbol': row['symbol'],
-            'link': row['TEP_url'],
-            'disease': row['disease'],
-            'uniprot_id': row['uniprot_id']
-        } for i, row in tep_merged.iterrows()}
-
-    with gzip.open(outputFile, 'wt', encoding="ascii") as f:
-        json.dump(TEPs, f)
-
-
+    
+    write_output(tep_merged, outputFile)
 
 if __name__ == '__main__':
     main()
